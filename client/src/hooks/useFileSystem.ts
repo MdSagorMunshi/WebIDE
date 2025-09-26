@@ -461,18 +461,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   };
 
-  const updateProjectName = async (newName: string) => {
-    if (currentProject) {
-      const updatedProject = {
-        ...currentProject,
-        name: newName.trim()
-      };
-      setCurrentProject(updatedProject);
-      await storage.saveProject(updatedProject);
-    }
-  };
-
-
   const findFile = useCallback((files: FileItem[], fileId: string): FileItem | null => {
     for (const file of files) {
       if (file.id === fileId) return file;
@@ -483,6 +471,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     return null;
   }, []);
+
+  const updateProjectName = async (newName: string) => {
+    if (currentProject) {
+      const updatedProject = {
+        ...currentProject,
+        name: newName.trim()
+      };
+      setCurrentProject(updatedProject);
+      await storage.saveProject(updatedProject);
+    }
+  };
 
   const getSelectedFile = useCallback(() => {
     if (!currentProject || !selectedFileId) return null;
