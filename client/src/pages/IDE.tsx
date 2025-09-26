@@ -90,13 +90,13 @@ export default function IDE() {
 
     const timeoutId = setTimeout(() => {
       const activeTab = openTabs.find(tab => tab.id === activeTabId);
-      if (activeTab && activeTab.content !== editorContent) {
+      if (activeTab && activeTab.content !== editorContent && activeTab.isDirty) {
         handleSaveFile();
       }
     }, 1000); // Auto-save after 1 second of inactivity
 
     return () => clearTimeout(timeoutId);
-  }, [editorContent, activeTabId, settings.autoSave]);
+  }, [editorContent, activeTabId, settings.autoSave, openTabs, handleSaveFile]);
 
   // Update theme based on settings
   useEffect(() => {
@@ -208,7 +208,7 @@ export default function IDE() {
     }
   };
 
-  const handleSaveFile = async () => {
+  const handleSaveFile = useCallback(async () => {
     if (!activeTabId || !selectedFileId) return;
 
     const tab = openTabs.find(t => t.id === activeTabId);
@@ -233,7 +233,7 @@ export default function IDE() {
         variant: "destructive"
       });
     }
-  };
+  }, [activeTabId, selectedFileId, openTabs, editorContent, updateFileContent, toast]);
 
   // Keyboard shortcuts
   useEffect(() => {
