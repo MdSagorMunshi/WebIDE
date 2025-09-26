@@ -45,7 +45,7 @@ export default function IDE() {
   const isMobile = useIsMobile();
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
-  
+
   // File system
   const {
     currentProject,
@@ -84,42 +84,6 @@ export default function IDE() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
 
-  // Auto-save functionality
-  useEffect(() => {
-    if (!settings.autoSave || !activeTabId || !editorContent) return;
-
-    const timeoutId = setTimeout(() => {
-      const activeTab = openTabs.find(tab => tab.id === activeTabId);
-      if (activeTab && activeTab.content !== editorContent && activeTab.isDirty) {
-        handleSaveFile();
-      }
-    }, 1000); // Auto-save after 1 second of inactivity
-
-    return () => clearTimeout(timeoutId);
-  }, [editorContent, activeTabId, settings.autoSave, openTabs, handleSaveFile]);
-
-  // Update theme based on settings
-  useEffect(() => {
-    setTheme(settings.theme);
-  }, [settings.theme, setTheme]);
-
-  // Handle mobile view changes
-  const handleMobileViewChange = (view: MobileView) => {
-    setMobileView(view);
-    
-    switch (view) {
-      case 'files':
-        setShowMobileFiles(true);
-        break;
-      case 'settings':
-        setShowSettings(true);
-        break;
-      case 'export':
-        exportProject();
-        break;
-    }
-  };
-
   // File operations
   const handleFileSelect = useCallback((fileId: string) => {
     const file = findFile(currentProject?.files || [], fileId);
@@ -151,16 +115,94 @@ export default function IDE() {
     setEditorContent(newTab.content);
   }, [currentProject?.files, findFile, setSelectedFileId, openTabs]);
 
+  // Editor operations
+  const handleEditorChange = (value: string) => {
+    setEditorContent(value);
+
+    // Mark tab as dirty
+    if (activeTabId) {
+      setOpenTabs(prev => prev.map(tab => 
+        tab.id === activeTabId 
+          ? { ...tab, content: value, isDirty: tab.content !== value }
+          : tab
+      ));
+    }
+  };
+
+  const handleSaveFile = useCallback(async () => {
+    if (!activeTabId || !selectedFileId) return;
+
+    const tab = openTabs.find(t => t.id === activeTabId);
+    if (!tab) return;
+
+    try {
+      await updateFileContent(selectedFileId, editorContent);
+
+      // Mark tab as clean
+      setOpenTabs(prev => prev.map(t => 
+        t.id === activeTabId ? { ...t, content: editorContent, isDirty: false } : t
+      ));
+
+      toast({
+        title: "File saved",
+        description: `${tab.title} has been saved`
+      });
+    } catch (error) {
+      toast({
+        title: "Save failed",
+        description: "Failed to save file",
+        variant: "destructive"
+      });
+    }
+  }, [activeTabId, selectedFileId, openTabs, editorContent, updateFileContent, toast]);
+
+
+  // Auto-save functionality
+  useEffect(() => {
+    if (!settings.autoSave || !activeTabId || !editorContent) return;
+
+    const timeoutId = setTimeout(() => {
+      const activeTab = openTabs.find(tab => tab.id === activeTabId);
+      if (activeTab && activeTab.content !== editorContent && activeTab.isDirty) {
+        handleSaveFile();
+      }
+    }, 1000); // Auto-save after 1 second of inactivity
+
+    return () => clearTimeout(timeoutId);
+  }, [editorContent, activeTabId, settings.autoSave, openTabs, handleSaveFile]);
+
+  // Update theme based on settings
+  useEffect(() => {
+    setTheme(settings.theme);
+  }, [settings.theme, setTheme]);
+
+  // Handle mobile view changes
+  const handleMobileViewChange = (view: MobileView) => {
+    setMobileView(view);
+
+    switch (view) {
+      case 'files':
+        setShowMobileFiles(true);
+        break;
+      case 'settings':
+        setShowSettings(true);
+        break;
+      case 'export':
+        exportProject();
+        break;
+    }
+  };
+
   // Tab operations
   const handleCloseTab = (tabId: string) => {
     console.log('Closing tab:', tabId, 'Current tabs:', openTabs.map(t => ({ id: t.id, title: t.title })));
-    
+
     const tab = openTabs.find(t => t.id === tabId);
     if (!tab) {
       console.error('Tab not found for ID:', tabId);
       return;
     }
-    
+
     if (tab.isDirty && !confirm('You have unsaved changes. Close anyway?')) {
       return;
     }
@@ -193,47 +235,6 @@ export default function IDE() {
     setEditorContent(tab.content);
     setSelectedFileId(tab.fileId);
   };
-
-  // Editor operations
-  const handleEditorChange = (value: string) => {
-    setEditorContent(value);
-    
-    // Mark tab as dirty
-    if (activeTabId) {
-      setOpenTabs(prev => prev.map(tab => 
-        tab.id === activeTabId 
-          ? { ...tab, content: value, isDirty: tab.content !== value }
-          : tab
-      ));
-    }
-  };
-
-  const handleSaveFile = useCallback(async () => {
-    if (!activeTabId || !selectedFileId) return;
-
-    const tab = openTabs.find(t => t.id === activeTabId);
-    if (!tab) return;
-
-    try {
-      await updateFileContent(selectedFileId, editorContent);
-      
-      // Mark tab as clean
-      setOpenTabs(prev => prev.map(t => 
-        t.id === activeTabId ? { ...t, content: editorContent, isDirty: false } : t
-      ));
-
-      toast({
-        title: "File saved",
-        description: `${tab.title} has been saved`
-      });
-    } catch (error) {
-      toast({
-        title: "Save failed",
-        description: "Failed to save file",
-        variant: "destructive"
-      });
-    }
-  }, [activeTabId, selectedFileId, openTabs, editorContent, updateFileContent, toast]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -278,7 +279,7 @@ export default function IDE() {
               {currentProject?.name || 'My Project'}
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-2">
             <Button
               variant="ghost"
@@ -288,7 +289,7 @@ export default function IDE() {
             >
               {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
             </Button>
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -297,7 +298,7 @@ export default function IDE() {
             >
               <Settings size={16} />
             </Button>
-            
+
             <Button
               variant="default"
               size="sm"
@@ -361,7 +362,7 @@ export default function IDE() {
                   </Button>
                 </div>
               ))}
-              
+
               <Button
                 variant="ghost"
                 size="sm"
@@ -385,7 +386,7 @@ export default function IDE() {
                   Line 1, Column 1
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <Button
                   variant="ghost"
@@ -397,7 +398,7 @@ export default function IDE() {
                 >
                   <Save size={12} />
                 </Button>
-                
+
                 <Button
                   variant="ghost"
                   size="sm"
