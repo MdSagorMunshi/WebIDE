@@ -198,7 +198,7 @@ export function MonacoEditor({
 
   // Update editor theme when settings change
   useEffect(() => {
-    if (editorRef.current) {
+    if (editorRef.current && window.monaco?.editor) {
       // Map app theme to editor theme if editorTheme is auto
       let editorTheme = settings.editorTheme;
 
@@ -215,7 +215,7 @@ export function MonacoEditor({
   // Also update theme when document theme changes
   useEffect(() => {
     const observer = new MutationObserver(() => {
-      if (editorRef.current && (settings.editorTheme === 'vs-light' || settings.editorTheme === 'vs-dark')) {
+      if (editorRef.current && window.monaco?.editor && (settings.editorTheme === 'vs-light' || settings.editorTheme === 'vs-dark')) {
         const isDark = document.documentElement.classList.contains('dark');
         const theme = isDark ? 'vs-dark' : 'vs-light';
         window.monaco.editor.setTheme(theme);
