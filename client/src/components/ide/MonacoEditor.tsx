@@ -130,6 +130,40 @@ export function MonacoEditor({ value, language, onChange, settings, readOnly = f
     }
   }, [editor, language]);
 
+  // Update editor theme when settings change
+  useEffect(() => {
+    if (editorRef.current) {
+      // Map app theme to editor theme if editorTheme is auto
+      let editorTheme = settings.editorTheme;
+
+      if (editorTheme === 'vs-light' || editorTheme === 'vs-dark') {
+        // Auto-detect based on system/app theme
+        const isDark = document.documentElement.classList.contains('dark');
+        editorTheme = isDark ? 'vs-dark' : 'vs-light';
+      }
+
+      window.monaco.editor.setTheme(editorTheme);
+    }
+  }, [settings.editorTheme]);
+
+  // Also update theme when document theme changes
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      if (editorRef.current && (settings.editorTheme === 'vs-light' || settings.editorTheme === 'vs-dark')) {
+        const isDark = document.documentElement.classList.contains('dark');
+        const theme = isDark ? 'vs-dark' : 'vs-light';
+        window.monaco.editor.setTheme(theme);
+      }
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    return () => observer.disconnect();
+  }, [settings.editorTheme]);
+
   return (
     <div className="relative w-full h-full">
       {isLoading && (

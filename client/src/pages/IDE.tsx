@@ -57,6 +57,7 @@ export default function IDE() {
     deleteFile,
     renameFile,
     updateFileContent,
+    updateProjectName,
     findFile,
     getSelectedFile,
     toggleFolder,
@@ -83,6 +84,8 @@ export default function IDE() {
   const [editorContent, setEditorContent] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [isEditingProjectName, setIsEditingProjectName] = useState(false);
+  const [editingProjectName, setEditingProjectName] = useState('');
 
   // File operations
   const handleFileSelect = useCallback((fileId: string) => {
@@ -175,6 +178,37 @@ export default function IDE() {
   useEffect(() => {
     setTheme(settings.theme);
   }, [settings.theme, setTheme]);
+
+  // Project name editing functions
+  const handleStartEditingProjectName = () => {
+    setEditingProjectName(currentProject?.name || 'My Project');
+    setIsEditingProjectName(true);
+  };
+
+  const handleSaveProjectName = async () => {
+    if (editingProjectName.trim() && currentProject) {
+      try {
+        await updateProjectName(editingProjectName.trim());
+        
+        toast({
+          title: "Project renamed",
+          description: `Project renamed to "${editingProjectName.trim()}"`
+        });
+      } catch (error) {
+        toast({
+          title: "Rename failed",
+          description: "Failed to rename project",
+          variant: "destructive"
+        });
+      }
+    }
+    setIsEditingProjectName(false);
+  };
+
+  const handleCancelEditingProjectName = () => {
+    setIsEditingProjectName(false);
+    setEditingProjectName('');
+  };
 
   // Handle mobile view changes
   const handleMobileViewChange = (view: MobileView) => {
@@ -275,8 +309,48 @@ export default function IDE() {
               <Code className="text-primary text-xl" />
               <h1 className="text-lg font-semibold">WebIDE</h1>
             </div>
-            <div className="text-sm text-muted-foreground">
-              {currentProject?.name || 'My Project'}
+            <div className="flex items-center space-x-2">
+              {isEditingProjectName ? (
+                <div className="flex items-center space-x-2">
+                  <Input
+                    value={editingProjectName}
+                    onChange={(e) => setEditingProjectName(e.target.value)}
+                    className="text-sm h-8 w-32"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveProjectName();
+                      if (e.key === 'Escape') handleCancelEditingProjectName();
+                    }}
+                    autoFocus
+                    data-testid="input-project-name"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSaveProjectName}
+                    className="h-8 px-2"
+                    data-testid="button-save-project-name"
+                  >
+                    <Save size={14} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCancelEditingProjectName}
+                    className="h-8 px-2"
+                    data-testid="button-cancel-project-name"
+                  >
+                    <X size={14} />
+                  </Button>
+                </div>
+              ) : (
+                <div 
+                  className="text-sm text-muted-foreground hover:text-foreground cursor-pointer px-2 py-1 rounded hover:bg-muted transition-colors"
+                  onClick={handleStartEditingProjectName}
+                  data-testid="project-name-display"
+                >
+                  {currentProject?.name || 'My Project'}
+                </div>
+              )}
             </div>
           </div>
 
@@ -284,10 +358,15 @@ export default function IDE() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              onClick={() => {
+                const newTheme = theme === 'dark' ? 'light' : theme === 'light' ? 'system' : 'dark';
+                setTheme(newTheme);
+                updateSettings({ theme: newTheme });
+              }}
               data-testid="button-toggle-theme"
+              title={`Current: ${theme} theme`}
             >
-              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+              {theme === 'dark' ? <Sun size={16} /> : theme === 'light' ? <Moon size={16} /> : <Smartphone size={16} />}
             </Button>
 
             <Button
@@ -295,8 +374,19 @@ export default function IDE() {
               size="sm"
               onClick={() => setShowSettings(true)}
               data-testid="button-open-settings"
+              title="Settings"
             >
               <Settings size={16} />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={createNewProject}
+              data-testid="button-new-project"
+              title="New Project"
+            >
+              <Plus size={16} />
             </Button>
 
             <Button
@@ -304,6 +394,7 @@ export default function IDE() {
               size="sm"
               onClick={exportProject}
               data-testid="button-export-project"
+              title="Export Project"
             >
               <Download size={16} className="mr-1" />
               Export

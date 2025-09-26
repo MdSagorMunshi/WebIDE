@@ -137,12 +137,12 @@ export function SettingsModal({
                 value={settings.editorTheme}
                 onValueChange={(value) => onUpdateSettings({ editorTheme: value })}
               >
-                <SelectTrigger className="w-32" id="editor-theme-select" data-testid="select-editor-theme">
+                <SelectTrigger className="w-36" id="editor-theme-select" data-testid="select-editor-theme">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="vs-light">Light</SelectItem>
-                  <SelectItem value="vs-dark">Dark</SelectItem>
+                  <SelectItem value="vs-light">Auto Light</SelectItem>
+                  <SelectItem value="vs-dark">Auto Dark</SelectItem>
                   <SelectItem value="hc-black">High Contrast</SelectItem>
                 </SelectContent>
               </Select>

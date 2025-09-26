@@ -17,7 +17,7 @@ export function useFileSystem() {
   const initializeProject = async () => {
     try {
       const projects = await storage.getProjectsList();
-      
+
       if (projects.length > 0) {
         const latestProject = projects.sort((a, b) => b.lastModified - a.lastModified)[0];
         const project = await storage.getProject(latestProject.id);
@@ -109,7 +109,7 @@ p {
 
 document.addEventListener('DOMContentLoaded', function() {
     const container = document.querySelector('.container');
-    
+
     if (container) {
         container.addEventListener('click', function() {
             const colors = ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe'];
@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     await storage.saveProject(project);
     setCurrentProject(project);
-    
+
     toast({
       title: "New project created",
       description: "Ready to start coding!"
@@ -144,7 +144,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const existingFiles = parentId ? 
       findFile(currentProject.files, parentId)?.children || [] : 
       currentProject.files;
-    
+
     const existingFile = existingFiles.find(f => f.name === name && f.type === 'file');
     if (existingFile) {
       console.warn('File with name already exists:', name);
@@ -170,7 +170,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('New file created with ID:', newFile.id);
 
     const updatedProject = { ...currentProject };
-    
+
     if (parentId) {
       const addFileToParent = (files: FileItem[]): FileItem[] => {
         return files.map(file => {
@@ -217,7 +217,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     const updatedProject = { ...currentProject };
-    
+
     if (parentId) {
       const addFolderToParent = (files: FileItem[]): FileItem[] => {
         return files.map(file => {
@@ -312,30 +312,40 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }, [currentProject, toast]);
 
-  const updateFileContent = useCallback(async (fileId: string, content: string) => {
-    if (!currentProject) return;
-
-    const updateContent = (files: FileItem[]): FileItem[] => {
+  const updateFileContent = async (fileId: string, content: string) => {
+    const updateInFiles = (files: FileItem[]): FileItem[] => {
       return files.map(file => {
         if (file.id === fileId) {
-          return { ...file, content, size: content.length, lastModified: Date.now() };
+          return { ...file, content };
         }
-        if (file.children) {
-          return { ...file, children: updateContent(file.children) };
+        if (file.type === 'folder' && file.children) {
+          return { ...file, children: updateInFiles(file.children) };
         }
         return file;
       });
     };
 
-    const updatedProject = {
-      ...currentProject,
-      files: updateContent(currentProject.files),
-      lastModified: Date.now()
-    };
+    if (currentProject) {
+      const updatedProject = {
+        ...currentProject,
+        files: updateInFiles(currentProject.files)
+      };
+      setCurrentProject(updatedProject);
+      await storage.saveProject(updatedProject);
+    }
+  };
 
-    await storage.saveProject(updatedProject);
-    setCurrentProject(updatedProject);
-  }, [currentProject]);
+  const updateProjectName = async (newName: string) => {
+    if (currentProject) {
+      const updatedProject = {
+        ...currentProject,
+        name: newName.trim()
+      };
+      setCurrentProject(updatedProject);
+      await storage.saveProject(updatedProject);
+    }
+  };
+
 
   const findFile = useCallback((files: FileItem[], fileId: string): FileItem | null => {
     for (const file of files) {
@@ -396,7 +406,7 @@ document.addEventListener('DOMContentLoaded', function() {
     try {
       const files = await FileUtils.importProjectFromZip(zipFile);
       const projectName = zipFile.name.replace('.zip', '') || 'Imported Project';
-      
+
       const project: Project = {
         id: FileUtils.generateId(),
         name: projectName,
@@ -430,6 +440,7 @@ document.addEventListener('DOMContentLoaded', function() {
     deleteFile,
     renameFile,
     updateFileContent,
+    updateProjectName, // Added for project name update
     findFile,
     getSelectedFile,
     toggleFolder,
