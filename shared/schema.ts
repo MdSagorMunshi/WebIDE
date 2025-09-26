@@ -1,18 +1,68 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
+// Type definitions for WebIDE client-side storage
+// This file contains TypeScript interfaces for the data models used in the application
 
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-});
+export interface FileItem {
+  id: string;
+  name: string;
+  type: 'file' | 'folder';
+  content?: string;
+  parentId?: string;
+  children?: FileItem[];
+  path: string;
+  size?: number;
+  lastModified: number;
+}
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
-});
+export interface EditorTab {
+  id: string;
+  fileId: string;
+  title: string;
+  language: string;
+  content: string;
+  isDirty: boolean;
+  isActive: boolean;
+}
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export interface EditorSettings {
+  theme: 'light' | 'dark' | 'system';
+  fontSize: number;
+  tabSize: number;
+  editorTheme: string;
+  autoSave: boolean;
+  wordWrap: boolean;
+  minimap: boolean;
+  lineNumbers: boolean;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  files: FileItem[];
+  lastModified: number;
+}
+
+export interface ContextMenuData {
+  x: number;
+  y: number;
+  fileId: string;
+  fileName: string;
+  isVisible: boolean;
+}
+
+export interface PreviewData {
+  type: 'html' | 'markdown' | 'json' | 'image' | 'text';
+  content: string;
+  url?: string;
+}
+
+// Legacy types for server compatibility (if needed in future)
+export interface User {
+  id: string;
+  username: string;
+  password: string;
+}
+
+export interface InsertUser {
+  username: string;
+  password: string;
+}
