@@ -2,6 +2,8 @@ import { useState, useRef } from 'react';
 import { FileItem } from '@/types/ide';
 import { FileUtils } from '@/lib/fileUtils';
 import { ContextMenu } from './ContextMenu';
+import { CreateFileModal } from './CreateFileModal';
+import { CreateFolderModal } from './CreateFolderModal';
 import {
   ChevronDown,
   ChevronRight,
@@ -57,6 +59,8 @@ function FileTreeItem({
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState(file.name);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [showCreateFileModal, setShowCreateFileModal] = useState(false);
+  const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
   const { toast } = useToast();
 
   const isExpanded = expandedFolders.has(file.id);
@@ -93,23 +97,17 @@ function FileTreeItem({
     }
   };
 
-  const handleCreateFile = async () => {
-    const fileName = prompt('Enter file name:');
-    if (fileName?.trim()) {
-      const fileId = await onCreateFile(fileName.trim(), file.type === 'folder' ? file.id : undefined);
-      if (fileId && file.type === 'folder') {
-        onFolderToggle(file.id); // Expand folder to show new file
-      }
+  const handleCreateFile = async (fileName: string) => {
+    const fileId = await onCreateFile(fileName, file.type === 'folder' ? file.id : undefined);
+    if (fileId && file.type === 'folder') {
+      onFolderToggle(file.id); // Expand folder to show new file
     }
   };
 
-  const handleCreateFolder = async () => {
-    const folderName = prompt('Enter folder name:');
-    if (folderName?.trim()) {
-      const folderId = await onCreateFolder(folderName.trim(), file.type === 'folder' ? file.id : undefined);
-      if (folderId && file.type === 'folder') {
-        onFolderToggle(file.id); // Expand folder to show new folder
-      }
+  const handleCreateFolder = async (folderName: string) => {
+    const folderId = await onCreateFolder(folderName, file.type === 'folder' ? file.id : undefined);
+    if (folderId && file.type === 'folder') {
+      onFolderToggle(file.id); // Expand folder to show new folder
     }
   };
 
@@ -201,10 +199,28 @@ function FileTreeItem({
             setContextMenu(null);
           }}
           onDownload={file.type === 'file' ? handleDownload : undefined}
-          onCreateFile={file.type === 'folder' ? handleCreateFile : undefined}
-          onCreateFolder={file.type === 'folder' ? handleCreateFolder : undefined}
+          onCreateFile={file.type === 'folder' ? (() => {
+            setShowCreateFileModal(true);
+            setContextMenu(null);
+          }) : undefined}
+          onCreateFolder={file.type === 'folder' ? (() => {
+            setShowCreateFolderModal(true);
+            setContextMenu(null);
+          }) : undefined}
         />
       )}
+
+      <CreateFileModal
+        isOpen={showCreateFileModal}
+        onClose={() => setShowCreateFileModal(false)}
+        onCreateFile={handleCreateFile}
+      />
+
+      <CreateFolderModal
+        isOpen={showCreateFolderModal}
+        onClose={() => setShowCreateFolderModal(false)}
+        onCreateFolder={handleCreateFolder}
+      />
     </>
   );
 }
@@ -222,6 +238,8 @@ export function FileTree({
   onImportProject
 }: FileTreeProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showCreateFileModal, setShowCreateFileModal] = useState(false);
+  const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -234,18 +252,12 @@ export function FileTree({
     }
   };
 
-  const handleCreateFile = async () => {
-    const fileName = prompt('Enter file name:');
-    if (fileName?.trim()) {
-      await onCreateFile(fileName.trim());
-    }
+  const handleCreateFile = async (fileName: string) => {
+    await onCreateFile(fileName);
   };
 
-  const handleCreateFolder = async () => {
-    const folderName = prompt('Enter folder name:');
-    if (folderName?.trim()) {
-      await onCreateFolder(folderName.trim());
-    }
+  const handleCreateFolder = async (folderName: string) => {
+    await onCreateFolder(folderName);
   };
 
   return (
@@ -258,7 +270,7 @@ export function FileTree({
             variant="ghost"
             size="sm"
             className="p-1 h-6 w-6"
-            onClick={handleCreateFile}
+            onClick={() => setShowCreateFileModal(true)}
             title="New File"
             data-testid="button-create-file"
           >
@@ -268,7 +280,7 @@ export function FileTree({
             variant="ghost"
             size="sm"
             className="p-1 h-6 w-6"
-            onClick={handleCreateFolder}
+            onClick={() => setShowCreateFolderModal(true)}
             title="New Folder"
             data-testid="button-create-folder"
           >
@@ -322,6 +334,18 @@ export function FileTree({
         onChange={handleFileUpload}
         className="hidden"
         data-testid="file-upload-input"
+      />
+
+      <CreateFileModal
+        isOpen={showCreateFileModal}
+        onClose={() => setShowCreateFileModal(false)}
+        onCreateFile={handleCreateFile}
+      />
+
+      <CreateFolderModal
+        isOpen={showCreateFolderModal}
+        onClose={() => setShowCreateFolderModal(false)}
+        onCreateFolder={handleCreateFolder}
       />
     </div>
   );

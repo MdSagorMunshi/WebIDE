@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { FileItem } from '@/types/ide';
 import { FileUtils } from '@/lib/fileUtils';
+import { CreateFileModal } from './CreateFileModal';
+import { CreateFolderModal } from './CreateFolderModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -93,6 +95,8 @@ export function MobileFilesPanel({
   const [showOptions, setShowOptions] = useState<string | null>(null);
   const [isRenaming, setIsRenaming] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
+  const [showCreateFileModal, setShowCreateFileModal] = useState(false);
+  const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
   const { toast } = useToast();
 
   const getCurrentFiles = (): FileItem[] => {
@@ -123,29 +127,23 @@ export function MobileFilesPanel({
     }
   };
 
-  const handleCreateFile = async () => {
-    const fileName = prompt('Enter file name:');
-    if (fileName?.trim()) {
-      const fileId = await onCreateFile(fileName.trim(), currentFolder?.id);
-      if (fileId) {
-        toast({
-          title: "File created",
-          description: `${fileName} has been created`
-        });
-      }
+  const handleCreateFile = async (fileName: string) => {
+    const fileId = await onCreateFile(fileName, currentFolder?.id);
+    if (fileId) {
+      toast({
+        title: "File created",
+        description: `${fileName} has been created`
+      });
     }
   };
 
-  const handleCreateFolder = async () => {
-    const folderName = prompt('Enter folder name:');
-    if (folderName?.trim()) {
-      const folderId = await onCreateFolder(folderName.trim(), currentFolder?.id);
-      if (folderId) {
-        toast({
-          title: "Folder created",
-          description: `${folderName} folder has been created`
-        });
-      }
+  const handleCreateFolder = async (folderName: string) => {
+    const folderId = await onCreateFolder(folderName, currentFolder?.id);
+    if (folderId) {
+      toast({
+        title: "Folder created",
+        description: `${folderName} folder has been created`
+      });
     }
   };
 
@@ -308,7 +306,7 @@ export function MobileFilesPanel({
         <div className="p-4 space-y-2 border-t border-border">
           <div className="flex space-x-2">
             <Button
-              onClick={handleCreateFile}
+              onClick={() => setShowCreateFileModal(true)}
               className="flex-1"
               data-testid="mobile-button-create-file"
             >
@@ -317,7 +315,7 @@ export function MobileFilesPanel({
             </Button>
             <Button
               variant="outline"
-              onClick={handleCreateFolder}
+              onClick={() => setShowCreateFolderModal(true)}
               className="flex-1"
               data-testid="mobile-button-create-folder"
             >
@@ -345,6 +343,18 @@ export function MobileFilesPanel({
           onChange={handleFileUpload}
           className="hidden"
           data-testid="mobile-file-upload-input"
+        />
+
+        <CreateFileModal
+          isOpen={showCreateFileModal}
+          onClose={() => setShowCreateFileModal(false)}
+          onCreateFile={handleCreateFile}
+        />
+
+        <CreateFolderModal
+          isOpen={showCreateFolderModal}
+          onClose={() => setShowCreateFolderModal(false)}
+          onCreateFolder={handleCreateFolder}
         />
       </div>
     </div>

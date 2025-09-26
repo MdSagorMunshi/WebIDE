@@ -366,7 +366,7 @@ export default function IDE() {
                 variant="ghost"
                 size="sm"
                 className="px-3 py-2 hover:bg-muted transition-colors flex items-center"
-                onClick={() => createFile('new-file.txt')}
+                onClick={() => createFile('untitled.txt')}
                 data-testid="button-new-tab"
               >
                 <Plus size={14} />
