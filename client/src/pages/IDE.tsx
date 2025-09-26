@@ -20,6 +20,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 // Icons
 import {
@@ -35,7 +37,12 @@ import {
   Columns,
   RotateCcw,
   FileText,
-  Smartphone
+  Smartphone,
+  AlertTriangle,
+  Info,
+  CheckCircle,
+  XCircle,
+  AlertCircle
 } from 'lucide-react';
 
 type MobileView = 'files' | 'editor' | 'preview' | 'settings' | 'export';
@@ -86,37 +93,108 @@ export default function IDE() {
   const [showSearch, setShowSearch] = useState(false);
   const [isEditingProjectName, setIsEditingProjectName] = useState(false);
   const [editingProjectName, setEditingProjectName] = useState('');
+  const [warningDialog, setWarningDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'warning' | 'error' | 'info' | 'confirm';
+    onConfirm?: () => void;
+    onCancel?: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
+
+  // Notification functions
+  const showToast = useCallback((
+    title: string, 
+    description?: string, 
+    variant: 'default' | 'destructive' = 'default',
+    icon?: React.ReactNode
+  ) => {
+    toast({
+      title: (
+        <div className="flex items-center gap-2">
+          {icon}
+          {title}
+        </div>
+      ),
+      description,
+      variant
+    });
+  }, [toast]);
+
+  const showWarningDialog = useCallback((
+    title: string,
+    message: string,
+    type: 'warning' | 'error' | 'info' | 'confirm' = 'info',
+    onConfirm?: () => void,
+    onCancel?: () => void
+  ) => {
+    setWarningDialog({
+      isOpen: true,
+      title,
+      message,
+      type,
+      onConfirm,
+      onCancel
+    });
+  }, []);
+
+  const closeWarningDialog = useCallback(() => {
+    setWarningDialog(prev => ({ ...prev, isOpen: false }));
+  }, []);
 
   // File operations
   const handleFileSelect = useCallback((fileId: string) => {
-    const file = findFile(currentProject?.files || [], fileId);
-    if (!file || file.type !== 'file') return;
+    try {
+      const file = findFile(currentProject?.files || [], fileId);
+      if (!file || file.type !== 'file') {
+        showToast('File Error', 'File not found or invalid file type', 'destructive', <XCircle size={16} />);
+        return;
+      }
 
-    setSelectedFileId(fileId);
+      setSelectedFileId(fileId);
 
-    // Check if tab is already open
-    const existingTab = openTabs.find(tab => tab.fileId === fileId);
-    if (existingTab) {
-      setActiveTabId(existingTab.id);
-      setEditorContent(existingTab.content);
-      return;
+      // Check if tab is already open
+      const existingTab = openTabs.find(tab => tab.fileId === fileId);
+      if (existingTab) {
+        setActiveTabId(existingTab.id);
+        setEditorContent(existingTab.content);
+        showToast('File Opened', `Switched to ${file.name}`, 'default', <FileText size={16} />);
+        return;
+      }
+
+      // Warn if opening too many tabs
+      if (openTabs.length >= 10) {
+        showWarningDialog(
+          'Too Many Tabs',
+          'You have many tabs open. Consider closing some to improve performance.',
+          'warning'
+        );
+      }
+
+      // Create new tab
+      const newTab: EditorTab = {
+        id: FileUtils.generateId(),
+        fileId: file.id,
+        title: file.name,
+        language: FileUtils.getFileExtension(file.name),
+        content: file.content || '',
+        isDirty: false,
+        isActive: true
+      };
+
+      setOpenTabs(prev => [...prev, newTab]);
+      setActiveTabId(newTab.id);
+      setEditorContent(newTab.content);
+      showToast('File Opened', `${file.name} opened in new tab`, 'default', <CheckCircle size={16} />);
+    } catch (error) {
+      showToast('Error', 'Failed to open file', 'destructive', <XCircle size={16} />);
     }
-
-    // Create new tab
-    const newTab: EditorTab = {
-      id: FileUtils.generateId(),
-      fileId: file.id,
-      title: file.name,
-      language: FileUtils.getFileExtension(file.name),
-      content: file.content || '',
-      isDirty: false,
-      isActive: true
-    };
-
-    setOpenTabs(prev => [...prev, newTab]);
-    setActiveTabId(newTab.id);
-    setEditorContent(newTab.content);
-  }, [currentProject?.files, findFile, setSelectedFileId, openTabs]);
+  }, [currentProject?.files, findFile, setSelectedFileId, openTabs, showToast, showWarningDialog]);
 
   // Editor operations
   const handleEditorChange = (value: string) => {
@@ -133,12 +211,25 @@ export default function IDE() {
   };
 
   const handleSaveFile = useCallback(async () => {
-    if (!activeTabId || !selectedFileId) return;
+    if (!activeTabId || !selectedFileId) {
+      showToast('Save Error', 'No active file to save', 'destructive', <AlertCircle size={16} />);
+      return;
+    }
 
     const tab = openTabs.find(t => t.id === activeTabId);
-    if (!tab) return;
+    if (!tab) {
+      showToast('Save Error', 'Active tab not found', 'destructive', <XCircle size={16} />);
+      return;
+    }
+
+    if (!tab.isDirty) {
+      showToast('No Changes', `${tab.title} has no unsaved changes`, 'default', <Info size={16} />);
+      return;
+    }
 
     try {
+      showToast('Saving...', `Saving ${tab.title}`, 'default', <Info size={16} />);
+      
       await updateFileContent(selectedFileId, editorContent);
 
       // Mark tab as clean
@@ -146,18 +237,12 @@ export default function IDE() {
         t.id === activeTabId ? { ...t, content: editorContent, isDirty: false } : t
       ));
 
-      toast({
-        title: "File saved",
-        description: `${tab.title} has been saved`
-      });
+      showToast('File Saved', `${tab.title} has been saved successfully`, 'default', <CheckCircle size={16} />);
     } catch (error) {
-      toast({
-        title: "Save failed",
-        description: "Failed to save file",
-        variant: "destructive"
-      });
+      console.error('Save error:', error);
+      showToast('Save Failed', `Failed to save ${tab.title}. Please try again.`, 'destructive', <XCircle size={16} />);
     }
-  }, [activeTabId, selectedFileId, openTabs, editorContent, updateFileContent, toast]);
+  }, [activeTabId, selectedFileId, openTabs, editorContent, updateFileContent, showToast]);
 
 
   // Auto-save functionality
@@ -186,21 +271,35 @@ export default function IDE() {
   };
 
   const handleSaveProjectName = async () => {
-    if (editingProjectName.trim() && currentProject) {
-      try {
-        await updateProjectName(editingProjectName.trim());
-        
-        toast({
-          title: "Project renamed",
-          description: `Project renamed to "${editingProjectName.trim()}"`
-        });
-      } catch (error) {
-        toast({
-          title: "Rename failed",
-          description: "Failed to rename project",
-          variant: "destructive"
-        });
-      }
+    if (!editingProjectName.trim()) {
+      showToast('Invalid Name', 'Project name cannot be empty', 'destructive', <AlertCircle size={16} />);
+      return;
+    }
+
+    if (!currentProject) {
+      showToast('Error', 'No active project to rename', 'destructive', <XCircle size={16} />);
+      setIsEditingProjectName(false);
+      return;
+    }
+
+    if (editingProjectName.trim() === currentProject.name) {
+      showToast('No Changes', 'Project name unchanged', 'default', <Info size={16} />);
+      setIsEditingProjectName(false);
+      return;
+    }
+
+    try {
+      await updateProjectName(editingProjectName.trim());
+      
+      showToast(
+        'Project Renamed', 
+        `Successfully renamed to "${editingProjectName.trim()}"`, 
+        'default', 
+        <CheckCircle size={16} />
+      );
+    } catch (error) {
+      console.error('Rename error:', error);
+      showToast('Rename Failed', 'Failed to rename project. Please try again.', 'destructive', <XCircle size={16} />);
     }
     setIsEditingProjectName(false);
   };
@@ -229,31 +328,40 @@ export default function IDE() {
 
   // Tab operations
   const handleCloseTab = (tabId: string) => {
-    console.log('Closing tab:', tabId, 'Current tabs:', openTabs.map(t => ({ id: t.id, title: t.title })));
-
     const tab = openTabs.find(t => t.id === tabId);
     if (!tab) {
-      console.error('Tab not found for ID:', tabId);
+      showToast('Error', 'Tab not found', 'destructive', <XCircle size={16} />);
       return;
     }
 
-    if (tab.isDirty && !confirm('You have unsaved changes. Close anyway?')) {
+    if (tab.isDirty) {
+      showWarningDialog(
+        'Unsaved Changes',
+        `You have unsaved changes in "${tab.title}". Do you want to close without saving?`,
+        'warning',
+        () => {
+          closeTab(tabId);
+          showToast('Tab Closed', `${tab.title} closed without saving`, 'default', <AlertTriangle size={16} />);
+        }
+      );
       return;
     }
 
+    closeTab(tabId);
+    showToast('Tab Closed', `${tab.title} closed`, 'default', <Info size={16} />);
+  };
+
+  const closeTab = (tabId: string) => {
     const newTabs = openTabs.filter(t => t.id !== tabId);
-    console.log('New tabs after filter:', newTabs.map(t => ({ id: t.id, title: t.title })));
     setOpenTabs(newTabs);
 
     if (activeTabId === tabId) {
       const nextTab = newTabs[newTabs.length - 1];
       if (nextTab) {
-        console.log('Switching to next tab:', nextTab.id, nextTab.title);
         setActiveTabId(nextTab.id);
         setEditorContent(nextTab.content);
         setSelectedFileId(nextTab.fileId);
       } else {
-        console.log('No more tabs, clearing editor');
         setActiveTabId(null);
         setEditorContent('');
         setSelectedFileId(null);
@@ -362,6 +470,7 @@ export default function IDE() {
                 const newTheme = theme === 'dark' ? 'light' : theme === 'light' ? 'system' : 'dark';
                 setTheme(newTheme);
                 updateSettings({ theme: newTheme });
+                showToast('Theme Changed', `Switched to ${newTheme} theme`, 'default', <Sun size={16} />);
               }}
               data-testid="button-toggle-theme"
               title={`Current: ${theme} theme`}
@@ -372,7 +481,10 @@ export default function IDE() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setShowSettings(true)}
+              onClick={() => {
+                setShowSettings(true);
+                showToast('Settings', 'Settings panel opened', 'default', <Settings size={16} />);
+              }}
               data-testid="button-open-settings"
               title="Settings"
             >
@@ -382,7 +494,17 @@ export default function IDE() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={createNewProject}
+              onClick={() => {
+                showWarningDialog(
+                  'Create New Project',
+                  'This will close the current project. Any unsaved changes will be lost. Continue?',
+                  'confirm',
+                  () => {
+                    createNewProject();
+                    showToast('New Project', 'New project created successfully', 'default', <CheckCircle size={16} />);
+                  }
+                );
+              }}
               data-testid="button-new-project"
               title="New Project"
             >
@@ -392,7 +514,14 @@ export default function IDE() {
             <Button
               variant="default"
               size="sm"
-              onClick={exportProject}
+              onClick={() => {
+                try {
+                  exportProject();
+                  showToast('Export Started', 'Project export initiated', 'default', <Download size={16} />);
+                } catch (error) {
+                  showToast('Export Failed', 'Failed to export project', 'destructive', <XCircle size={16} />);
+                }
+              }}
               data-testid="button-export-project"
               title="Export Project"
             >
@@ -594,6 +723,55 @@ export default function IDE() {
         storageInfo={storageInfo}
         onClearData={clearAllData}
       />
+
+      {/* Warning/Alert Dialog */}
+      <AlertDialog open={warningDialog.isOpen} onOpenChange={closeWarningDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              {warningDialog.type === 'warning' && <AlertTriangle className="text-amber-500" size={20} />}
+              {warningDialog.type === 'error' && <XCircle className="text-red-500" size={20} />}
+              {warningDialog.type === 'info' && <Info className="text-blue-500" size={20} />}
+              {warningDialog.type === 'confirm' && <AlertCircle className="text-orange-500" size={20} />}
+              {warningDialog.title}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {warningDialog.message}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={() => {
+                warningDialog.onCancel?.();
+                closeWarningDialog();
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            {(warningDialog.type === 'warning' || warningDialog.type === 'confirm') && (
+              <AlertDialogAction
+                onClick={() => {
+                  warningDialog.onConfirm?.();
+                  closeWarningDialog();
+                }}
+                className={warningDialog.type === 'warning' ? 'bg-amber-500 hover:bg-amber-600' : undefined}
+              >
+                {warningDialog.type === 'warning' ? 'Continue Anyway' : 'Confirm'}
+              </AlertDialogAction>
+            )}
+            {warningDialog.type === 'info' && (
+              <AlertDialogAction onClick={closeWarningDialog}>
+                OK
+              </AlertDialogAction>
+            )}
+            {warningDialog.type === 'error' && (
+              <AlertDialogAction onClick={closeWarningDialog} className="bg-red-500 hover:bg-red-600">
+                OK
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
