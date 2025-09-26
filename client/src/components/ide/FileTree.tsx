@@ -28,6 +28,8 @@ interface FileTreeProps {
   onCreateFolder: (name: string, parentId?: string) => Promise<string | undefined>;
   onDeleteFile: (fileId: string) => void;
   onRenameFile: (fileId: string, newName: string) => void;
+  onDuplicateFile: (fileId: string) => Promise<string | undefined>;
+  onMoveFile: (fileId: string, newParentId?: string) => void;
   onImportProject: (file: File) => void;
 }
 
@@ -42,6 +44,8 @@ interface FileTreeItemProps {
   onCreateFolder: (name: string, parentId?: string) => Promise<string | undefined>;
   onDeleteFile: (fileId: string) => void;
   onRenameFile: (fileId: string, newName: string) => void;
+  onDuplicateFile: (fileId: string) => Promise<string | undefined>;
+  onMoveFile: (fileId: string, newParentId?: string) => void;
 }
 
 function FileTreeItem({
@@ -54,13 +58,16 @@ function FileTreeItem({
   onCreateFile,
   onCreateFolder,
   onDeleteFile,
-  onRenameFile
+  onRenameFile,
+  onDuplicateFile,
+  onMoveFile
 }: FileTreeItemProps) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState(file.name);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [showCreateFileModal, setShowCreateFileModal] = useState(false);
   const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const { toast } = useToast();
 
   const isExpanded = expandedFolders.has(file.id);
@@ -121,15 +128,55 @@ function FileTreeItem({
     }
   };
 
+  const handleDuplicate = async () => {
+    if (file.type === 'file') {
+      await onDuplicateFile(file.id);
+    }
+  };
+
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData('text/plain', file.id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (file.type === 'folder') {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      setIsDragOver(true);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    if (file.type === 'folder') {
+      const draggedFileId = e.dataTransfer.getData('text/plain');
+      if (draggedFileId && draggedFileId !== file.id) {
+        onMoveFile(draggedFileId, file.id);
+      }
+    }
+  };
+
   return (
     <>
       <div
         className={`flex items-center py-1 px-2 cursor-pointer rounded text-sm hover:bg-muted/50 ${
           isSelected ? 'bg-accent text-accent-foreground' : ''
-        }`}
+        } ${isDragOver ? 'bg-primary/20 border-2 border-primary border-dashed' : ''}`}
         style={{ paddingLeft: `${level * 12 + 8}px` }}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
+        draggable={!isRenaming}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
         data-testid={`file-tree-item-${file.name}`}
       >
         {file.type === 'folder' && (
@@ -178,6 +225,8 @@ function FileTreeItem({
               onCreateFolder={onCreateFolder}
               onDeleteFile={onDeleteFile}
               onRenameFile={onRenameFile}
+              onDuplicateFile={onDuplicateFile}
+              onMoveFile={onMoveFile}
             />
           ))}
         </div>
@@ -199,6 +248,7 @@ function FileTreeItem({
             setContextMenu(null);
           }}
           onDownload={file.type === 'file' ? handleDownload : undefined}
+          onDuplicate={file.type === 'file' ? handleDuplicate : undefined}
           onCreateFile={file.type === 'folder' ? (() => {
             setShowCreateFileModal(true);
             setContextMenu(null);
@@ -235,6 +285,8 @@ export function FileTree({
   onCreateFolder,
   onDeleteFile,
   onRenameFile,
+  onDuplicateFile,
+  onMoveFile,
   onImportProject
 }: FileTreeProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -320,6 +372,8 @@ export function FileTree({
                 onCreateFolder={onCreateFolder}
                 onDeleteFile={onDeleteFile}
                 onRenameFile={onRenameFile}
+                onDuplicateFile={onDuplicateFile}
+                onMoveFile={onMoveFile}
               />
             ))}
           </div>

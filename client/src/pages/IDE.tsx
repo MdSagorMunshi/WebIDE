@@ -63,6 +63,8 @@ export default function IDE() {
     createFolder,
     deleteFile,
     renameFile,
+    duplicateFile,
+    moveFile,
     updateFileContent,
     updateProjectName,
     findFile,
@@ -70,7 +72,8 @@ export default function IDE() {
     toggleFolder,
     exportProject,
     importProject,
-    createNewProject
+    createNewProject,
+    clearWorkspace
   } = useFileSystem();
 
   // Settings
@@ -93,6 +96,9 @@ export default function IDE() {
   const [showSearch, setShowSearch] = useState(false);
   const [isEditingProjectName, setIsEditingProjectName] = useState(false);
   const [editingProjectName, setEditingProjectName] = useState('');
+  const [splitView, setSplitView] = useState(false);
+  const [secondaryTabId, setSecondaryTabId] = useState<string | null>(null);
+  const [secondaryContent, setSecondaryContent] = useState('');
   const [warningDialog, setWarningDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -244,6 +250,30 @@ export default function IDE() {
     }
   }, [activeTabId, selectedFileId, openTabs, editorContent, updateFileContent, showToast]);
 
+  const handleFormatCode = useCallback(async () => {
+    if (!activeTabId) return;
+
+    const tab = openTabs.find(t => t.id === activeTabId);
+    if (!tab) return;
+
+    try {
+      const formattedContent = await FileUtils.formatCode(editorContent, tab.language);
+      setEditorContent(formattedContent);
+      
+      // Mark tab as dirty if content changed
+      if (formattedContent !== tab.content) {
+        setOpenTabs(prev => prev.map(t => 
+          t.id === activeTabId ? { ...t, content: formattedContent, isDirty: true } : t
+        ));
+      }
+
+      showToast('Code Formatted', `${tab.title} has been formatted`, 'default', <CheckCircle size={16} />);
+    } catch (error) {
+      console.error('Format error:', error);
+      showToast('Format Failed', 'Failed to format code', 'destructive', <XCircle size={16} />);
+    }
+  }, [activeTabId, openTabs, editorContent, showToast]);
+
 
   // Auto-save functionality
   useEffect(() => {
@@ -307,6 +337,33 @@ export default function IDE() {
   const handleCancelEditingProjectName = () => {
     setIsEditingProjectName(false);
     setEditingProjectName('');
+  };
+
+  const handleClearWorkspace = () => {
+    showWarningDialog(
+      'Clear Workspace',
+      'This will delete all files in the current project. This action cannot be undone. Continue?',
+      'warning',
+      () => {
+        clearWorkspace();
+        setOpenTabs([]);
+        setActiveTabId(null);
+        setSelectedFileId(null);
+        setEditorContent('');
+      }
+    );
+  };
+
+  const handleToggleSplitView = () => {
+    setSplitView(!splitView);
+    if (!splitView && openTabs.length > 1) {
+      // Set secondary tab to the next available tab
+      const nextTab = openTabs.find(tab => tab.id !== activeTabId);
+      if (nextTab) {
+        setSecondaryTabId(nextTab.id);
+        setSecondaryContent(nextTab.content);
+      }
+    }
   };
 
   // Handle mobile view changes
@@ -512,6 +569,26 @@ export default function IDE() {
             </Button>
 
             <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleToggleSplitView}
+              data-testid="button-toggle-split"
+              title={splitView ? "Close Split View" : "Split View"}
+            >
+              <Columns size={16} />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearWorkspace}
+              data-testid="button-clear-workspace"
+              title="Clear Workspace"
+            >
+              <RotateCcw size={16} />
+            </Button>
+
+            <Button
               variant="default"
               size="sm"
               onClick={() => {
@@ -546,6 +623,8 @@ export default function IDE() {
             onCreateFolder={createFolder}
             onDeleteFile={deleteFile}
             onRenameFile={renameFile}
+            onDuplicateFile={duplicateFile}
+            onMoveFile={moveFile}
             onImportProject={importProject}
           />
         )}
@@ -623,6 +702,17 @@ export default function IDE() {
                   variant="ghost"
                   size="sm"
                   className="p-1 h-6 w-6"
+                  onClick={handleFormatCode}
+                  title="Format Code (Ctrl+Shift+F)"
+                  data-testid="button-format-code"
+                >
+                  <Code size={12} />
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="p-1 h-6 w-6"
                   onClick={() => setShowSearch(!showSearch)}
                   title="Find (Ctrl+P)"
                   data-testid="button-toggle-search"
@@ -655,6 +745,12 @@ export default function IDE() {
                   language={activeTab.language}
                   onChange={handleEditorChange}
                   settings={settings}
+                  splitView={splitView}
+                  secondaryValue={splitView ? secondaryContent : undefined}
+                  secondaryLanguage={splitView && secondaryTabId ? 
+                    openTabs.find(t => t.id === secondaryTabId)?.language : undefined}
+                  onSecondaryChange={splitView ? setSecondaryContent : undefined}
+                  onFormat={handleFormatCode}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center bg-card text-muted-foreground">

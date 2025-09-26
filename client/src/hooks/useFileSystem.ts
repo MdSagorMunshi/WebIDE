@@ -282,6 +282,132 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }, [currentProject, selectedFileId, toast]);
 
+  const duplicateFile = useCallback(async (fileId: string) => {
+    if (!currentProject) return;
+
+    const sourceFile = findFile(currentProject.files, fileId);
+    if (!sourceFile || sourceFile.type !== 'file') return;
+
+    const duplicatedFile = FileUtils.duplicateFile(sourceFile);
+
+    const updatedProject = { ...currentProject };
+
+    if (sourceFile.parentId) {
+      const addFileToParent = (files: FileItem[]): FileItem[] => {
+        return files.map(file => {
+          if (file.id === sourceFile.parentId && file.type === 'folder') {
+            return {
+              ...file,
+              children: [...(file.children || []), duplicatedFile]
+            };
+          }
+          if (file.children) {
+            return { ...file, children: addFileToParent(file.children) };
+          }
+          return file;
+        });
+      };
+      updatedProject.files = addFileToParent(updatedProject.files);
+    } else {
+      updatedProject.files.push(duplicatedFile);
+    }
+
+    updatedProject.lastModified = Date.now();
+    await storage.saveProject(updatedProject);
+    setCurrentProject(updatedProject);
+
+    toast({
+      title: "File duplicated",
+      description: `${duplicatedFile.name} has been created`
+    });
+
+    return duplicatedFile.id;
+  }, [currentProject, findFile, toast]);
+
+  const moveFile = useCallback(async (fileId: string, newParentId?: string) => {
+    if (!currentProject) return;
+
+    const fileToMove = findFile(currentProject.files, fileId);
+    if (!fileToMove) return;
+
+    // Remove file from current location
+    const removeFileFromTree = (files: FileItem[]): FileItem[] => {
+      return files.filter(file => {
+        if (file.id === fileId) return false;
+        if (file.children) {
+          file.children = removeFileFromTree(file.children);
+        }
+        return true;
+      });
+    };
+
+    // Update file's parent reference
+    const movedFile = {
+      ...fileToMove,
+      parentId: newParentId,
+      path: newParentId ? 
+        `${findFile(currentProject.files, newParentId)?.path}/${fileToMove.name}` : 
+        fileToMove.name
+    };
+
+    let updatedFiles = removeFileFromTree(currentProject.files);
+
+    // Add file to new location
+    if (newParentId) {
+      const addFileToParent = (files: FileItem[]): FileItem[] => {
+        return files.map(file => {
+          if (file.id === newParentId && file.type === 'folder') {
+            return {
+              ...file,
+              children: [...(file.children || []), movedFile]
+            };
+          }
+          if (file.children) {
+            return { ...file, children: addFileToParent(file.children) };
+          }
+          return file;
+        });
+      };
+      updatedFiles = addFileToParent(updatedFiles);
+    } else {
+      updatedFiles.push(movedFile);
+    }
+
+    const updatedProject = {
+      ...currentProject,
+      files: updatedFiles,
+      lastModified: Date.now()
+    };
+
+    await storage.saveProject(updatedProject);
+    setCurrentProject(updatedProject);
+
+    toast({
+      title: "File moved",
+      description: `${fileToMove.name} has been moved`
+    });
+  }, [currentProject, findFile, toast]);
+
+  const clearWorkspace = useCallback(async () => {
+    if (!currentProject) return;
+
+    const clearedProject = {
+      ...currentProject,
+      files: [],
+      lastModified: Date.now()
+    };
+
+    await storage.saveProject(clearedProject);
+    setCurrentProject(clearedProject);
+    setSelectedFileId(null);
+    setExpandedFolders(new Set());
+
+    toast({
+      title: "Workspace cleared",
+      description: "All files have been removed from the project"
+    });
+  }, [currentProject, toast]);
+
   const renameFile = useCallback(async (fileId: string, newName: string) => {
     if (!currentProject) return;
 
@@ -439,13 +565,16 @@ document.addEventListener('DOMContentLoaded', function() {
     createFolder,
     deleteFile,
     renameFile,
+    duplicateFile,
+    moveFile,
     updateFileContent,
-    updateProjectName, // Added for project name update
+    updateProjectName,
     findFile,
     getSelectedFile,
     toggleFolder,
     exportProject,
     importProject,
-    createNewProject
+    createNewProject,
+    clearWorkspace
   };
 }

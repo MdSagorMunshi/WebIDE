@@ -136,20 +136,18 @@ export function ContextMenu({
         Rename
       </Button>
 
-      {onDuplicate && (
-        <Button
-          variant="ghost"
-          className="w-full justify-start px-3 py-2 text-sm h-auto font-normal"
-          onClick={() => {
-            onDuplicate();
-            onClose();
-          }}
-          data-testid="context-menu-duplicate"
-        >
-          <Copy size={14} className="mr-2" />
-          Duplicate
-        </Button>
-      )}
+      <Button
+        variant="ghost"
+        className="w-full justify-start px-3 py-2 text-sm h-auto font-normal"
+        onClick={() => {
+          onDuplicate?.();
+          onClose();
+        }}
+        data-testid="context-menu-duplicate"
+      >
+        <Copy size={14} className="mr-2" />
+        Duplicate
+      </Button>
 
       {onDownload && (
         <Button

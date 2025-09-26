@@ -207,6 +207,67 @@ export class FileUtils {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
+  static duplicateFile(file: FileItem, suffix: string = 'copy'): FileItem {
+    const nameParts = file.name.split('.');
+    const extension = nameParts.length > 1 ? nameParts.pop() : '';
+    const baseName = nameParts.join('.');
+    const newName = extension ? `${baseName}_${suffix}.${extension}` : `${baseName}_${suffix}`;
+
+    return {
+      ...file,
+      id: this.generateId(),
+      name: newName,
+      path: file.path.replace(file.name, newName),
+      lastModified: Date.now()
+    };
+  }
+
+  static async formatCode(content: string, language: string): Promise<string> {
+    try {
+      const prettier = await import('prettier');
+      
+      let parser;
+      switch (language) {
+        case 'javascript':
+        case 'jsx':
+          parser = 'babel';
+          break;
+        case 'typescript':
+        case 'tsx':
+          parser = 'typescript';
+          break;
+        case 'html':
+          parser = 'html';
+          break;
+        case 'css':
+        case 'scss':
+        case 'sass':
+          parser = 'css';
+          break;
+        case 'json':
+          parser = 'json';
+          break;
+        case 'markdown':
+          parser = 'markdown';
+          break;
+        default:
+          return content; // Return unchanged if no parser available
+      }
+
+      return prettier.format(content, {
+        parser,
+        semi: true,
+        singleQuote: true,
+        tabWidth: 2,
+        trailingComma: 'es5',
+        printWidth: 80
+      });
+    } catch (error) {
+      console.warn('Failed to format code:', error);
+      return content;
+    }
+  }
+
   static buildFilePath(files: FileItem[], fileId: string): string {
     const findPath = (items: FileItem[], id: string, currentPath = ''): string | null => {
       for (const item of items) {

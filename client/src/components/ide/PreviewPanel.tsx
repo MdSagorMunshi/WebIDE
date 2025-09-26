@@ -104,16 +104,36 @@ export function PreviewPanel({ files, selectedFile }: PreviewPanelProps) {
       return;
     }
 
-    // Simple markdown to HTML conversion
+    // Enhanced markdown to HTML conversion
     let html = selectedFile.content
-      .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-      .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+      // Headers
+      .replace(/^#### (.*$)/gim, '<h4>$1</h4>')
       .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+      .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+      .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+      // Code blocks
+      .replace(/```(\w+)?\n([\s\S]*?)```/gim, '<pre><code class="language-$1">$2</code></pre>')
+      // Inline code
+      .replace(/`([^`]+)`/gim, '<code>$1</code>')
+      // Bold and italic
+      .replace(/\*\*\*(.*?)\*\*\*/gim, '<strong><em>$1</em></strong>')
       .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/gim, '<em>$1</em>')
-      .replace(/`(.*?)`/gim, '<code>$1</code>')
+      // Links
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/gim, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+      // Images
+      .replace(/!\[([^\]]*)\]\(([^)]+)\)/gim, '<img src="$2" alt="$1" style="max-width: 100%; height: auto;" />')
+      // Lists
       .replace(/^\* (.*$)/gim, '<li>$1</li>')
+      .replace(/^- (.*$)/gim, '<li>$1</li>')
+      .replace(/^\d+\. (.*$)/gim, '<li>$1</li>')
+      // Blockquotes
+      .replace(/^> (.*$)/gim, '<blockquote>$1</blockquote>')
+      // Line breaks
       .replace(/\n/gim, '<br>');
+
+    // Wrap lists
+    html = html.replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
 
     html = `
       <div style="
@@ -122,7 +142,21 @@ export function PreviewPanel({ files, selectedFile }: PreviewPanelProps) {
         padding: 20px;
         max-width: 800px;
         margin: 0 auto;
+        color: #333;
       ">
+        <style>
+          h1, h2, h3, h4 { margin-top: 1.5em; margin-bottom: 0.5em; }
+          h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 0.3em; }
+          h2 { color: #34495e; border-bottom: 1px solid #bdc3c7; padding-bottom: 0.2em; }
+          code { background: #f8f9fa; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
+          pre { background: #f8f9fa; padding: 1em; border-radius: 5px; overflow-x: auto; }
+          pre code { background: none; padding: 0; }
+          blockquote { border-left: 4px solid #3498db; margin: 1em 0; padding-left: 1em; color: #7f8c8d; }
+          ul { padding-left: 1.5em; }
+          li { margin: 0.25em 0; }
+          a { color: #3498db; text-decoration: none; }
+          a:hover { text-decoration: underline; }
+        </style>
         ${html}
       </div>
     `;

@@ -8,6 +8,11 @@ interface MonacoEditorProps {
   onChange: (value: string) => void;
   settings: EditorSettings;
   readOnly?: boolean;
+  splitView?: boolean;
+  secondaryValue?: string;
+  secondaryLanguage?: string;
+  onSecondaryChange?: (value: string) => void;
+  onFormat?: () => void;
 }
 
 declare global {
@@ -17,9 +22,22 @@ declare global {
   }
 }
 
-export function MonacoEditor({ value, language, onChange, settings, readOnly = false }: MonacoEditorProps) {
+export function MonacoEditor({ 
+  value, 
+  language, 
+  onChange, 
+  settings, 
+  readOnly = false,
+  splitView = false,
+  secondaryValue,
+  secondaryLanguage,
+  onSecondaryChange,
+  onFormat
+}: MonacoEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
+  const secondaryEditorRef = useRef<HTMLDivElement>(null);
   const [editor, setEditor] = useState<any>(null);
+  const [secondaryEditor, setSecondaryEditor] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -44,7 +62,7 @@ export function MonacoEditor({ value, language, onChange, settings, readOnly = f
     const initializeEditor = () => {
       if (!editorRef.current || !window.monaco) return;
 
-      const editorInstance = window.monaco.editor.create(editorRef.current, {
+      const editorOptions = {
         value,
         language: FileUtils.getLanguageFromExtension(language),
         theme: settings.editorTheme,
@@ -74,7 +92,9 @@ export function MonacoEditor({ value, language, onChange, settings, readOnly = f
           horizontalScrollbarSize: 17,
           arrowSize: 30
         }
-      });
+      };
+
+      const editorInstance = window.monaco.editor.create(editorRef.current, editorOptions);
 
       // Handle content changes
       editorInstance.onDidChangeModelContent(() => {
@@ -82,7 +102,39 @@ export function MonacoEditor({ value, language, onChange, settings, readOnly = f
         onChange(newValue);
       });
 
+      // Add format action
+      if (onFormat) {
+        editorInstance.addAction({
+          id: 'format-code',
+          label: 'Format Code',
+          keybindings: [window.monaco.KeyMod.CtrlCmd | window.monaco.KeyMod.Shift | window.monaco.KeyCode.KeyF],
+          contextMenuGroupId: '1_modification',
+          run: () => {
+            onFormat();
+          }
+        });
+      }
+
       setEditor(editorInstance);
+
+      // Initialize secondary editor for split view
+      if (splitView && secondaryEditorRef.current && secondaryValue !== undefined) {
+        const secondaryOptions = {
+          ...editorOptions,
+          value: secondaryValue,
+          language: secondaryLanguage ? FileUtils.getLanguageFromExtension(secondaryLanguage) : editorOptions.language
+        };
+
+        const secondaryEditorInstance = window.monaco.editor.create(secondaryEditorRef.current, secondaryOptions);
+
+        secondaryEditorInstance.onDidChangeModelContent(() => {
+          const newValue = secondaryEditorInstance.getValue();
+          onSecondaryChange?.(newValue);
+        });
+
+        setSecondaryEditor(secondaryEditorInstance);
+      }
+
       setIsLoading(false);
     };
 
@@ -91,6 +143,9 @@ export function MonacoEditor({ value, language, onChange, settings, readOnly = f
     return () => {
       if (editor) {
         editor.dispose();
+      }
+      if (secondaryEditor) {
+        secondaryEditor.dispose();
       }
     };
   }, []);
@@ -105,6 +160,17 @@ export function MonacoEditor({ value, language, onChange, settings, readOnly = f
       }
     }
   }, [editor, value]);
+
+  // Update secondary editor when value changes externally
+  useEffect(() => {
+    if (secondaryEditor && secondaryValue !== undefined && secondaryValue !== secondaryEditor.getValue()) {
+      const position = secondaryEditor.getPosition();
+      secondaryEditor.setValue(secondaryValue);
+      if (position) {
+        secondaryEditor.setPosition(position);
+      }
+    }
+  }, [secondaryEditor, secondaryValue]);
 
   // Update editor settings
   useEffect(() => {
@@ -171,11 +237,26 @@ export function MonacoEditor({ value, language, onChange, settings, readOnly = f
           <div className="text-muted-foreground">Loading editor...</div>
         </div>
       )}
-      <div
-        ref={editorRef}
-        className="w-full h-full"
-        data-testid="monaco-editor"
-      />
+      {splitView ? (
+        <div className="flex w-full h-full">
+          <div
+            ref={editorRef}
+            className="w-1/2 h-full border-r border-border"
+            data-testid="monaco-editor-primary"
+          />
+          <div
+            ref={secondaryEditorRef}
+            className="w-1/2 h-full"
+            data-testid="monaco-editor-secondary"
+          />
+        </div>
+      ) : (
+        <div
+          ref={editorRef}
+          className="w-full h-full"
+          data-testid="monaco-editor"
+        />
+      )}
     </div>
   );
 }
