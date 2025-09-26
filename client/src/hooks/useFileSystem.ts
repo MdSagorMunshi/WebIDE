@@ -322,7 +322,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     return duplicatedFile.id;
-  }, [currentProject, findFile, toast]);
+  }, [currentProject, toast]);
 
   const moveFile = useCallback(async (fileId: string, newParentId?: string) => {
     if (!currentProject) return;
