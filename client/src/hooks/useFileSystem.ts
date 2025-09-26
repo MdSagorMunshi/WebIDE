@@ -324,6 +324,17 @@ document.addEventListener('DOMContentLoaded', function() {
     return duplicatedFile.id;
   }, [currentProject, toast]);
 
+  const findFile = useCallback((files: FileItem[], fileId: string): FileItem | null => {
+    for (const file of files) {
+      if (file.id === fileId) return file;
+      if (file.children) {
+        const found = findFile(file.children, fileId);
+        if (found) return found;
+      }
+    }
+    return null;
+  }, []);
+
   const moveFile = useCallback(async (fileId: string, newParentId?: string) => {
     if (!currentProject) return;
 
@@ -460,17 +471,6 @@ document.addEventListener('DOMContentLoaded', function() {
       await storage.saveProject(updatedProject);
     }
   };
-
-  const findFile = useCallback((files: FileItem[], fileId: string): FileItem | null => {
-    for (const file of files) {
-      if (file.id === fileId) return file;
-      if (file.children) {
-        const found = findFile(file.children, fileId);
-        if (found) return found;
-      }
-    }
-    return null;
-  }, []);
 
   const updateProjectName = async (newName: string) => {
     if (currentProject) {
